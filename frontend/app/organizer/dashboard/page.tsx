@@ -74,6 +74,16 @@ interface DashboardData {
   car_parking_guests: GuestListItem[];
   bike_parking_guests: GuestListItem[];
   room_guests: GuestListItem[];
+  room_allocations?: Array<{
+    id: number;
+    guest_id: number;
+    event_id: number;
+    guest_name: string;
+    guest_status: string;
+    hotel_name: string;
+    room_number: string;
+    allocated_at: string;
+  }>;
 }
 
 interface AnalyticsData {
@@ -123,6 +133,15 @@ export default function OrganizerDashboard() {
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
+  const [guestOptions, setGuestOptions] = useState<GuestListItem[]>([]);
+  const [roomAllocations, setRoomAllocations] = useState<DashboardData['room_allocations']>([]);
+  const [roomForm, setRoomForm] = useState({
+    guest_id: '',
+    hotel_name: '',
+    room_number: '',
+  });
+  const [allocatingRoom, setAllocatingRoom] = useState(false);
+  const [roomStatus, setRoomStatus] = useState('');
   const previousSosCount = useRef(0);
 
   const syncSosCount = (count: number) => {
@@ -167,12 +186,23 @@ export default function OrganizerDashboard() {
     setBikeParkingGuests(Array.isArray(bikeRes.data) ? bikeRes.data : []);
   };
 
+  const fetchGuestsForAllocation = async (eventId: number) => {
+    const res = await api.get(`/guests/event/${eventId}`);
+    setGuestOptions(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchRoomAllocations = async (eventId: number) => {
+    const res = await api.get(`/organizer/room-allocations/${eventId}`);
+    setRoomAllocations(Array.isArray(res.data) ? res.data : []);
+  };
+
   const refreshOrganizerSnapshot = async () => {
     const res = await api.get('/dashboard/organizer');
     const loadedDashboard: DashboardData = res.data;
     setDashboard(loadedDashboard);
     setCarParkingGuests(Array.isArray(loadedDashboard.car_parking_guests) ? loadedDashboard.car_parking_guests : []);
     setBikeParkingGuests(Array.isArray(loadedDashboard.bike_parking_guests) ? loadedDashboard.bike_parking_guests : []);
+    setRoomAllocations(Array.isArray(loadedDashboard.room_allocations) ? loadedDashboard.room_allocations : []);
     return loadedDashboard;
   };
 
@@ -207,6 +237,8 @@ export default function OrganizerDashboard() {
         await fetchAnalytics();
         await fetchGuestLocationDistribution();
         await fetchParkingGuests();
+        await fetchGuestsForAllocation(loadedDashboard.event_id);
+        await fetchRoomAllocations(loadedDashboard.event_id);
       } catch (err: any) {
         setError('Unable to load organizer dashboard');
         showToast('Unable to load organizer dashboard', 'error');
@@ -228,6 +260,7 @@ export default function OrganizerDashboard() {
         await fetchAnalytics();
         await fetchGuestLocationDistribution();
         await fetchParkingGuests();
+        await fetchRoomAllocations(latestDashboard.event_id);
       } catch (err: any) {
         if (err.response?.status === 401 || err.response?.status === 403) return;
       }
@@ -313,6 +346,33 @@ export default function OrganizerDashboard() {
       showToast(msg, 'error');
     } finally {
       setSendingAnnouncement(false);
+    }
+  };
+
+  const allocateRoom = async () => {
+    if (!dashboard?.event_id) return;
+    if (!roomForm.guest_id || !roomForm.hotel_name.trim() || !roomForm.room_number.trim()) {
+      setRoomStatus('Please select a guest and enter hotel and room details.');
+      return;
+    }
+    setAllocatingRoom(true);
+    setRoomStatus('');
+    try {
+      await api.post('/organizer/allocate-room', {
+        guest_id: Number(roomForm.guest_id),
+        event_id: dashboard.event_id,
+        hotel_name: roomForm.hotel_name.trim(),
+        room_number: roomForm.room_number.trim(),
+      });
+      setRoomForm({ guest_id: '', hotel_name: '', room_number: '' });
+      setRoomStatus('Room allocated successfully');
+      await fetchRoomAllocations(dashboard.event_id);
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Unable to allocate room';
+      setRoomStatus(msg);
+      showToast(msg, 'error');
+    } finally {
+      setAllocatingRoom(false);
     }
   };
 
@@ -718,6 +778,77 @@ export default function OrganizerDashboard() {
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {renderTable('Car Parking Guests', carParkingGuests)}
         {renderTable('Bike Parking Guests', bikeParkingGuests)}
+      </section>
+
+      <section className="section-fade premium-card">
+        <h2 className="font-serif text-3xl">Room Allocation</h2>
+        <p className="mb-6 mt-2 text-sm text-[var(--text-soft)]">
+          Assign hotel rooms to guests who requested accommodation.
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
+          <div className="space-y-4 rounded-2xl border border-[#C6A75E]/25 bg-[#fffdf8] p-4">
+            <label className="text-sm text-[var(--text-soft)]">Select Guest</label>
+            <select
+              value={roomForm.guest_id}
+              onChange={(e) => setRoomForm((prev) => ({ ...prev, guest_id: e.target.value }))}
+              className="premium-input"
+            >
+              <option value="">Choose a guest</option>
+              {guestOptions.map((guest) => (
+                <option key={guest.id} value={guest.id}>
+                  {guest.name} (#{guest.id})
+                </option>
+              ))}
+            </select>
+
+            <label className="text-sm text-[var(--text-soft)]">Hotel Name</label>
+            <input
+              value={roomForm.hotel_name}
+              onChange={(e) => setRoomForm((prev) => ({ ...prev, hotel_name: e.target.value }))}
+              placeholder="Grand Palace Hotel"
+              className="premium-input"
+            />
+
+            <label className="text-sm text-[var(--text-soft)]">Room Number</label>
+            <input
+              value={roomForm.room_number}
+              onChange={(e) => setRoomForm((prev) => ({ ...prev, room_number: e.target.value }))}
+              placeholder="305"
+              className="premium-input"
+            />
+
+            <button
+              onClick={allocateRoom}
+              disabled={allocatingRoom}
+              className="gold-button w-full disabled:opacity-60"
+            >
+              {allocatingRoom ? 'Allocating...' : 'Allocate Room'}
+            </button>
+
+            {roomStatus && <p className="text-sm text-[var(--text-soft)]">{roomStatus}</p>}
+          </div>
+
+          <div className="rounded-2xl border border-[#C6A75E]/25 bg-white p-4">
+            <h3 className="font-semibold text-lg text-[var(--text-dark)]">Allocated Rooms</h3>
+            {roomAllocations && roomAllocations.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {roomAllocations.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-[#C6A75E]/15 bg-[#fffdf8] p-3">
+                    <p className="text-sm font-semibold text-[var(--text-dark)]">{item.guest_name}</p>
+                    <p className="text-xs text-[var(--text-soft)]">
+                      Hotel: {item.hotel_name} | Room: {item.room_number}
+                    </p>
+                    <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      {item.guest_status || 'registered'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--text-soft)]">No rooms allocated yet.</p>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="rounded-xl shadow-md border p-4 section-fade">

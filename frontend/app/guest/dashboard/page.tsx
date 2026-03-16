@@ -63,6 +63,7 @@ export default function GuestDashboard() {
     vehicle_number: '',
   });
   const [countdownText, setCountdownText] = useState('');
+  const [roomDetails, setRoomDetails] = useState<{ hotel_name: string; room_number: string } | null>(null);
   const popupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const goLogin = () => {
@@ -85,6 +86,22 @@ export default function GuestDashboard() {
       vehicle_count: String(vehicleCount),
       vehicle_number: data.vehicle_number || '',
     });
+  };
+
+  const fetchRoomDetails = async (guestId: number) => {
+    try {
+      const res = await api.get(`/guest/room-details/${guestId}`);
+      if (res.data && res.data.hotel_name) {
+        setRoomDetails({
+          hotel_name: res.data.hotel_name,
+          room_number: res.data.room_number,
+        });
+      } else {
+        setRoomDetails(null);
+      }
+    } catch {
+      setRoomDetails(null);
+    }
   };
 
   const triggerSOS = async () => {
@@ -141,6 +158,13 @@ export default function GuestDashboard() {
 
     fetchDashboard();
   }, [authLoading, token, showToast]);
+
+  useEffect(() => {
+    if (!token || !event?.guest_id) return;
+    fetchRoomDetails(event.guest_id);
+    const interval = setInterval(() => fetchRoomDetails(event.guest_id), 10000);
+    return () => clearInterval(interval);
+  }, [token, event?.guest_id]);
 
   useEffect(() => {
     if (!event?.event_date) {
@@ -424,6 +448,18 @@ export default function GuestDashboard() {
             </div>
           </section>
         )}
+
+        <section className={hasInviteBackground ? 'premium-card bg-white/85 backdrop-blur-md' : 'premium-card'}>
+          <h3 className="font-serif text-2xl mb-2">Your Accommodation</h3>
+          {roomDetails ? (
+            <div className="mt-3 space-y-2 text-[var(--text-dark)]">
+              <p><span className="font-semibold">Hotel Name:</span> {roomDetails.hotel_name}</p>
+              <p><span className="font-semibold">Room Number:</span> {roomDetails.room_number}</p>
+            </div>
+          ) : (
+            <p className="text-[var(--text-soft)]">Room details not assigned yet.</p>
+          )}
+        </section>
 
         <section className={hasInviteBackground ? 'premium-card text-center bg-white/85 backdrop-blur-md' : 'premium-card text-center'}>
           <h3 className="font-serif text-2xl mb-2">Need immediate help?</h3>

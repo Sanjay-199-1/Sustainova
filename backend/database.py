@@ -60,7 +60,7 @@ from uuid import uuid4
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy import text
 
-ALLOWED_SCHEMA_TABLES = {"events", "guests", "attendance", "sos", "vehicle_details"}
+ALLOWED_SCHEMA_TABLES = {"events", "guests", "attendance", "sos", "vehicle_details", "room_allocations"}
 
 
 def _safe_table_name(table_name: str) -> str:
@@ -258,6 +258,52 @@ def ensure_runtime_schema():
                     connection.execute(
                         text(
                             "CREATE INDEX IF NOT EXISTS ix_vehicle_details_vehicle_type ON vehicle_details (vehicle_type)"
+                        )
+                    )
+
+            if not _table_exists(connection, "room_allocations"):
+                if connection.engine.dialect.name == "postgresql":
+                    connection.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS room_allocations (
+                                id SERIAL PRIMARY KEY,
+                                guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+                                event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                                hotel_name VARCHAR NOT NULL,
+                                room_number VARCHAR NOT NULL,
+                                allocated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                                CONSTRAINT uq_room_allocations_guest_id UNIQUE (guest_id)
+                            )
+                            """
+                        )
+                    )
+                    connection.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
+                        )
+                    )
+                elif connection.engine.dialect.name == "sqlite":
+                    connection.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS room_allocations (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                guest_id INTEGER NOT NULL,
+                                event_id INTEGER NOT NULL,
+                                hotel_name TEXT NOT NULL,
+                                room_number TEXT NOT NULL,
+                                allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(guest_id),
+                                FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE CASCADE,
+                                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+                            )
+                            """
+                        )
+                    )
+                    connection.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
                         )
                     )
                 elif connection.engine.dialect.name == "sqlite":

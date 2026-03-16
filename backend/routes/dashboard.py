@@ -8,7 +8,7 @@ import time
 import logging
 
 from database import get_db
-from models.models import Event, Guest, SOS, Attendance, VehicleDetail
+from models.models import Event, Guest, SOS, Attendance, VehicleDetail, RoomAllocation
 from dependencies.auth import get_current_user
 from ml.predict import predict_event_resources
 from utils.phone import phone_candidates
@@ -580,6 +580,30 @@ def organizer_dashboard(
         if g.needs_room and g.needs_room.lower() == "yes"
     ]
 
+    room_allocations = query_with_retry(
+        db,
+        lambda: (
+            db.query(RoomAllocation, Guest)
+            .join(Guest, Guest.id == RoomAllocation.guest_id)
+            .filter(RoomAllocation.event_id == event.id)
+            .order_by(RoomAllocation.allocated_at.desc())
+            .all()
+        ),
+    )
+    room_allocations_payload = [
+        {
+            "id": allocation.id,
+            "guest_id": allocation.guest_id,
+            "event_id": allocation.event_id,
+            "guest_name": guest.name,
+            "guest_status": guest.status,
+            "hotel_name": allocation.hotel_name,
+            "room_number": allocation.room_number,
+            "allocated_at": allocation.allocated_at,
+        }
+        for allocation, guest in room_allocations
+    ]
+
     rooms_needed = query_with_retry(
         db,
         lambda: db.query(Guest).filter(
@@ -673,7 +697,8 @@ def organizer_dashboard(
         "rooms_needed_guests": rooms_needed_guests,
         "car_parking_guests": car_parking_guests,
         "bike_parking_guests": bike_parking_guests,
-        "room_guests": room_guests
+        "room_guests": room_guests,
+        "room_allocations": room_allocations_payload,
     }
 
 

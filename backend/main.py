@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 # ✅ include events
-from routes import auth, events, guests, entrance, sos, dashboard, reminders, checkin, ml, announcements
+from routes import auth, events, guests, entrance, sos, dashboard, reminders, checkin, ml, announcements, rooms
 
 app = FastAPI(title="Sustainova Backend")
 
@@ -41,6 +41,7 @@ app.include_router(checkin.router)
 app.include_router(ml.router)
 app.include_router(announcements.router)
 app.include_router(announcements.ws_router)
+app.include_router(rooms.router)
 
 
 @app.get("/")

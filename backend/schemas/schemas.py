@@ -184,6 +184,27 @@ class GuestRegistrationUpdate(BaseModel):
 class GuestRegistrationStatusOut(BaseModel):
     guest_id: int
     status: str
+
+
+# ---------------- ROOMS ----------------
+
+class RoomAllocationCreate(BaseModel):
+    guest_id: int
+    event_id: int
+    hotel_name: str = Field(..., min_length=2, max_length=200)
+    room_number: str = Field(..., min_length=1, max_length=50)
+
+
+class RoomAllocationOut(BaseModel):
+    id: int
+    guest_id: int
+    event_id: int
+    hotel_name: str
+    room_number: str
+    allocated_at: datetime
+
+    class Config:
+        from_attributes = True
 # ---------------- SOS ----------------
 
 class SOSCreate(BaseModel):
