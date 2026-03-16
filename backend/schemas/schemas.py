@@ -193,6 +193,7 @@ class RoomAllocationCreate(BaseModel):
     event_id: int
     hotel_name: str = Field(..., min_length=2, max_length=200)
     room_number: str = Field(..., min_length=1, max_length=50)
+    location: str = Field(..., min_length=2, max_length=500)
 
 
 class RoomAllocationOut(BaseModel):
@@ -201,6 +202,7 @@ class RoomAllocationOut(BaseModel):
     event_id: int
     hotel_name: str
     room_number: str
+    location: str | None = None
     allocated_at: datetime
 
     class Config:

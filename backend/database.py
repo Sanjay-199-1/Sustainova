@@ -272,6 +272,7 @@ def ensure_runtime_schema():
                                 event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
                                 hotel_name VARCHAR NOT NULL,
                                 room_number VARCHAR NOT NULL,
+                                location TEXT,
                                 allocated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
                                 CONSTRAINT uq_room_allocations_guest_id UNIQUE (guest_id)
                             )
@@ -293,6 +294,7 @@ def ensure_runtime_schema():
                                 event_id INTEGER NOT NULL,
                                 hotel_name TEXT NOT NULL,
                                 room_number TEXT NOT NULL,
+                                location TEXT,
                                 allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 UNIQUE(guest_id),
                                 FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE CASCADE,
@@ -306,6 +308,15 @@ def ensure_runtime_schema():
                             "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
                         )
                     )
+            else:
+                if connection.engine.dialect.name == "postgresql":
+                    existing_columns = _get_columns(connection, "room_allocations")
+                    if "location" not in existing_columns:
+                        connection.execute(text("ALTER TABLE room_allocations ADD COLUMN location TEXT"))
+                elif connection.engine.dialect.name == "sqlite":
+                    existing_columns = _get_columns(connection, "room_allocations")
+                    if "location" not in existing_columns:
+                        connection.execute(text("ALTER TABLE room_allocations ADD COLUMN location TEXT"))
                 elif connection.engine.dialect.name == "sqlite":
                     connection.execute(
                         text(

@@ -63,7 +63,7 @@ export default function GuestDashboard() {
     vehicle_number: '',
   });
   const [countdownText, setCountdownText] = useState('');
-  const [roomDetails, setRoomDetails] = useState<{ hotel_name: string; room_number: string } | null>(null);
+  const [roomDetails, setRoomDetails] = useState<{ hotel_name: string; room_number: string; location?: string | null } | null>(null);
   const popupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const goLogin = () => {
@@ -95,6 +95,7 @@ export default function GuestDashboard() {
         setRoomDetails({
           hotel_name: res.data.hotel_name,
           room_number: res.data.room_number,
+          location: res.data.location || null,
         });
       } else {
         setRoomDetails(null);
@@ -455,6 +456,9 @@ export default function GuestDashboard() {
             <div className="mt-3 space-y-2 text-[var(--text-dark)]">
               <p><span className="font-semibold">Hotel Name:</span> {roomDetails.hotel_name}</p>
               <p><span className="font-semibold">Room Number:</span> {roomDetails.room_number}</p>
+              {roomDetails.location && (
+                <p><span className="font-semibold">Location:</span> {roomDetails.location}</p>
+              )}
             </div>
           ) : (
             <p className="text-[var(--text-soft)]">Room details not assigned yet.</p>

@@ -34,7 +34,7 @@ export default function LuxurySelect({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between rounded-2xl border border-[#C6A75E]/40 bg-white px-4 py-3 text-left shadow-sm transition-all duration-300 hover:shadow-md"
+        className="premium-select flex w-full items-center justify-between text-left shadow-sm transition-all duration-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[#C6A75E]/40"
       >
         <span className="text-[#2C2C2C]">{value || placeholder}</span>
         <svg
@@ -55,7 +55,7 @@ export default function LuxurySelect({
       </button>
 
       {open && (
-        <div className="animate-fadeIn absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-[#C6A75E]/30 bg-white shadow-xl">
+        <div className="animate-fadeIn absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-[#C6A75E]/30 bg-white shadow-xl">
           {options.map((option) => (
             <button
               key={option}
@@ -64,7 +64,7 @@ export default function LuxurySelect({
                 onChange(option);
                 setOpen(false);
               }}
-              className={`w-full cursor-pointer px-4 py-3 text-left transition-all duration-200 hover:bg-[#F8F5F0] ${
+              className={`w-full cursor-pointer px-4 py-2.5 text-left transition-all duration-200 hover:bg-[#F8F5F0] ${
                 value === option
                   ? "bg-[#C6A75E]/10 font-medium text-[#C6A75E]"
                   : ""

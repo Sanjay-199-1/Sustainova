@@ -599,6 +599,7 @@ def organizer_dashboard(
             "guest_status": guest.status,
             "hotel_name": allocation.hotel_name,
             "room_number": allocation.room_number,
+            "location": allocation.location,
             "allocated_at": allocation.allocated_at,
         }
         for allocation, guest in room_allocations

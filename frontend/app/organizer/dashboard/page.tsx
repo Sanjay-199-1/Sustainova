@@ -82,6 +82,7 @@ interface DashboardData {
     guest_status: string;
     hotel_name: string;
     room_number: string;
+    location?: string | null;
     allocated_at: string;
   }>;
 }
@@ -139,6 +140,7 @@ export default function OrganizerDashboard() {
     guest_id: '',
     hotel_name: '',
     room_number: '',
+    location: '',
   });
   const [allocatingRoom, setAllocatingRoom] = useState(false);
   const [roomStatus, setRoomStatus] = useState('');
@@ -352,7 +354,11 @@ export default function OrganizerDashboard() {
   const allocateRoom = async () => {
     if (!dashboard?.event_id) return;
     if (!roomForm.guest_id || !roomForm.hotel_name.trim() || !roomForm.room_number.trim()) {
-      setRoomStatus('Please select a guest and enter hotel and room details.');
+      setRoomStatus('Please select a guest and enter hotel, room, and location details.');
+      return;
+    }
+    if (!roomForm.location.trim()) {
+      setRoomStatus('Please enter hotel location.');
       return;
     }
     setAllocatingRoom(true);
@@ -363,8 +369,9 @@ export default function OrganizerDashboard() {
         event_id: dashboard.event_id,
         hotel_name: roomForm.hotel_name.trim(),
         room_number: roomForm.room_number.trim(),
+        location: roomForm.location.trim(),
       });
-      setRoomForm({ guest_id: '', hotel_name: '', room_number: '' });
+      setRoomForm({ guest_id: '', hotel_name: '', room_number: '', location: '' });
       setRoomStatus('Room allocated successfully');
       await fetchRoomAllocations(dashboard.event_id);
     } catch (err: any) {
@@ -817,6 +824,14 @@ export default function OrganizerDashboard() {
               className="premium-input"
             />
 
+            <label className="text-sm text-[var(--text-soft)]">Hotel Location</label>
+            <input
+              value={roomForm.location}
+              onChange={(e) => setRoomForm((prev) => ({ ...prev, location: e.target.value }))}
+              placeholder="Sri Venkateswara College of Engineering, Sriperumbudur"
+              className="premium-input"
+            />
+
             <button
               onClick={allocateRoom}
               disabled={allocatingRoom}
@@ -838,6 +853,11 @@ export default function OrganizerDashboard() {
                     <p className="text-xs text-[var(--text-soft)]">
                       Hotel: {item.hotel_name} | Room: {item.room_number}
                     </p>
+                    {item.location && (
+                      <p className="mt-1 text-xs text-[var(--text-soft)]">
+                        Location: {item.location}
+                      </p>
+                    )}
                     <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                       {item.guest_status || 'registered'}
                     </span>

@@ -141,6 +141,7 @@ class RoomAllocation(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
     hotel_name = Column(String, nullable=False)
     room_number = Column(String, nullable=False)
+    location = Column(String, nullable=True)
     allocated_at = Column(DateTime, default=datetime.utcnow)
 
     guest = relationship("Guest", back_populates="room_allocation")

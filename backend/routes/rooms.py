@@ -36,12 +36,14 @@ def allocate_room(
     if allocation:
         allocation.hotel_name = payload.hotel_name.strip()
         allocation.room_number = payload.room_number.strip()
+        allocation.location = payload.location.strip()
     else:
         allocation = RoomAllocation(
             guest_id=guest.id,
             event_id=event.id,
             hotel_name=payload.hotel_name.strip(),
             room_number=payload.room_number.strip(),
+            location=payload.location.strip(),
         )
         db.add(allocation)
 
@@ -102,6 +104,7 @@ def list_room_allocations(
             "event_id": allocation.event_id,
             "hotel_name": allocation.hotel_name,
             "room_number": allocation.room_number,
+            "location": allocation.location,
             "allocated_at": allocation.allocated_at,
             "guest_name": guest.name,
             "guest_status": guest.status,
