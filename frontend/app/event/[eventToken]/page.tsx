@@ -2,10 +2,13 @@
 
 import { AxiosError } from 'axios';
 import { useParams } from 'next/navigation';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import LuxurySelect from '../../../components/LuxurySelect';
 import api from '../../../services/api';
 import { formatPhoneForInput, normalizePhone } from '../../../services/phone';
+
+const phoneRegex = /^[6-9]\d{9}$/;
+const aadhaarRegex = /^\d{12}$/;
 
 export default function GuestPage() {
   const params = useParams();
@@ -26,8 +29,22 @@ export default function GuestPage() {
     room_type: '',
   });
 
+  const [transportType, setTransportType] = useState('');
   const [status, setStatus] = useState('');
   const [guestQrCodeUrl, setGuestQrCodeUrl] = useState('');
+
+  const phoneValid = phoneRegex.test(normalizePhone(form.phone));
+  const phoneError = form.phone && !phoneValid ? 'Enter a valid 10-digit phone number' : '';
+  const aadhaarRequired = form.needs_room === 'Yes';
+  const aadhaarFilled = form.aadhar_number.trim().length > 0;
+  const aadhaarValid = aadhaarRequired
+    ? aadhaarRegex.test(form.aadhar_number)
+    : !aadhaarFilled || aadhaarRegex.test(form.aadhar_number);
+  const aadhaarError =
+    (aadhaarRequired || aadhaarFilled) && !aadhaarValid
+      ? 'Enter a valid 12-digit Aadhaar number'
+      : '';
+  const isSubmitDisabled = !phoneValid || !aadhaarValid;
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -45,13 +62,48 @@ export default function GuestPage() {
   };
 
   const setSelectValue = (name: 'transport_type' | 'needs_room', value: string) => {
+    if (name === 'transport_type') {
+      setTransportType(value.trim().toLowerCase());
+    }
     setForm((prev) => {
+      if (name === 'transport_type') {
+        return { ...prev, [name]: value.trim().toLowerCase() };
+      }
       if (name === 'needs_room' && value === 'No') {
         return { ...prev, [name]: value, aadhar_number: '', room_type: '' };
       }
       return { ...prev, [name]: value };
     });
   };
+
+  useEffect(() => {
+    const normalizedTransport = transportType.trim().toLowerCase();
+    if (normalizedTransport === 'car') {
+      setForm((prev) => ({
+        ...prev,
+        bike_count: 0,
+        bike_numbers: [],
+      }));
+      return;
+    }
+    if (normalizedTransport === 'bike') {
+      setForm((prev) => ({
+        ...prev,
+        car_count: 0,
+        car_numbers: [],
+      }));
+      return;
+    }
+    if (normalizedTransport === '' || normalizedTransport === 'public transport') {
+      setForm((prev) => ({
+        ...prev,
+        car_count: 0,
+        bike_count: 0,
+        car_numbers: [],
+        bike_numbers: [],
+      }));
+    }
+  }, [transportType]);
 
   const normalizeVehicleNumber = (value: string) =>
     value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -156,11 +208,28 @@ export default function GuestPage() {
         aadhar_number: '',
         room_type: '',
       });
+      setTransportType('');
     } catch (err: unknown) {
       const apiErr = err as AxiosError<{ detail?: string }>;
       setStatus(apiErr.response?.data?.detail || 'Something went wrong');
     }
   };
+
+  const normalizedTransport = transportType.trim().toLowerCase();
+  const shouldShowCarParking = normalizedTransport === 'car' || normalizedTransport === 'both';
+  const shouldShowBikeParking = normalizedTransport === 'bike' || normalizedTransport === 'both';
+  const shouldShowParking = shouldShowCarParking || shouldShowBikeParking;
+  const transportOptions = [
+    { label: 'Bike', value: 'bike' },
+    { label: 'Car', value: 'car' },
+    { label: 'Both', value: 'both' },
+    { label: 'Public Transport', value: 'public transport' },
+  ];
+  const roomTypeOptions = [
+    { label: 'Single Bed', value: 'Single Bed' },
+    { label: 'Double Bed', value: 'Double Bed' },
+    { label: 'Family', value: 'Triple Bed' },
+  ];
 
   return (
     <main className="min-h-[80vh] flex items-center justify-center px-4 py-8">
@@ -175,7 +244,17 @@ export default function GuestPage() {
           </div>
           <div>
             <label className="form-label">Mobile Number</label>
-            <input name="phone" value={form.phone} placeholder="Enter your mobile number" required onChange={handleChange} inputMode="numeric" maxLength={11} className="premium-input" />
+            <input
+              name="phone"
+              value={form.phone}
+              placeholder="Enter your mobile number"
+              required
+              onChange={handleChange}
+              inputMode="numeric"
+              maxLength={11}
+              className={`premium-input ${phoneError ? 'border-red-500 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' : ''}`}
+            />
+            {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
           </div>
           <div>
             <label className="form-label">Number of People</label>
@@ -204,7 +283,7 @@ export default function GuestPage() {
 
           <LuxurySelect
             value={form.transport_type}
-            options={['Bike', 'Car', 'Public Transport']}
+            options={transportOptions}
             placeholder="Transport Type"
             onChange={(value: string) => setSelectValue('transport_type', value)}
           />
@@ -213,115 +292,121 @@ export default function GuestPage() {
             For better event arrangements, please let us know your parking and accommodation needs.
           </p>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg text-[#1F4F46]">Parking Requirement</h3>
-            <p className="text-sm text-[var(--text-soft)]">
-              Add counts for cars and bikes to generate vehicle number inputs.
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-[#C6A75E]/30 bg-[#fffdf8] p-4">
-                <p className="text-sm font-semibold text-[var(--text-dark)]">Cars</p>
-                <label className="mt-3 block text-sm text-[var(--text-soft)]" htmlFor="car_count">
-                  Number of Cars
-                </label>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateVehicleCount('car', form.car_count - 1)}
-                    className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
-                    aria-label="Decrease car count"
-                  >
-                    -
-                  </button>
-                  <input
-                    id="car_count"
-                    name="car_count"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.car_count}
-                    onChange={(e) => updateVehicleCount('car', Number(e.target.value))}
-                    className="premium-input number-spinner text-center"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => updateVehicleCount('car', form.car_count + 1)}
-                    className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
-                    aria-label="Increase car count"
-                  >
-                    +
-                  </button>
-                </div>
+          {shouldShowParking && (
+            <div className="space-y-2 transition-all duration-300">
+              <h3 className="font-semibold text-lg text-[#1F4F46]">Parking Requirement</h3>
+              <p className="text-sm text-[var(--text-soft)]">
+                Add counts for cars and bikes to generate vehicle number inputs.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {shouldShowCarParking && (
+                  <div className="rounded-2xl border border-[#C6A75E]/30 bg-[#fffdf8] p-4">
+                    <p className="text-sm font-semibold text-[var(--text-dark)]">Cars</p>
+                    <label className="mt-3 block text-sm text-[var(--text-soft)]" htmlFor="car_count">
+                      Number of Cars
+                    </label>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateVehicleCount('car', form.car_count - 1)}
+                        className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
+                        aria-label="Decrease car count"
+                      >
+                        -
+                      </button>
+                      <input
+                        id="car_count"
+                        name="car_count"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={form.car_count}
+                        onChange={(e) => updateVehicleCount('car', Number(e.target.value))}
+                        className="premium-input number-spinner text-center"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateVehicleCount('car', form.car_count + 1)}
+                        className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
+                        aria-label="Increase car count"
+                      >
+                        +
+                      </button>
+                    </div>
 
-                {form.car_count > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {form.car_numbers.map((value, index) => (
-                      <div key={`car-${index}`} className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)]">{`Car Number ${index + 1}`}</label>
-                        <input
-                          value={value}
-                          onChange={(e) => updateVehicleNumber('car', index, e.target.value)}
-                          placeholder="TN01AB1234"
-                          className="premium-input"
-                        />
+                    {form.car_count > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {form.car_numbers.map((value, index) => (
+                          <div key={`car-${index}`} className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)]">{`Car Number ${index + 1}`}</label>
+                            <input
+                              value={value}
+                              onChange={(e) => updateVehicleNumber('car', index, e.target.value)}
+                              placeholder="TN01AB1234"
+                              className="premium-input"
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
-              </div>
 
-              <div className="rounded-2xl border border-[#C6A75E]/30 bg-[#fffdf8] p-4">
-                <p className="text-sm font-semibold text-[var(--text-dark)]">Bikes</p>
-                <label className="mt-3 block text-sm text-[var(--text-soft)]" htmlFor="bike_count">
-                  Number of Bikes
-                </label>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateVehicleCount('bike', form.bike_count - 1)}
-                    className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
-                    aria-label="Decrease bike count"
-                  >
-                    -
-                  </button>
-                  <input
-                    id="bike_count"
-                    name="bike_count"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.bike_count}
-                    onChange={(e) => updateVehicleCount('bike', Number(e.target.value))}
-                    className="premium-input number-spinner text-center"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => updateVehicleCount('bike', form.bike_count + 1)}
-                    className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
-                    aria-label="Increase bike count"
-                  >
-                    +
-                  </button>
-                </div>
+                {shouldShowBikeParking && (
+                  <div className="rounded-2xl border border-[#C6A75E]/30 bg-[#fffdf8] p-4">
+                    <p className="text-sm font-semibold text-[var(--text-dark)]">Bikes</p>
+                    <label className="mt-3 block text-sm text-[var(--text-soft)]" htmlFor="bike_count">
+                      Number of Bikes
+                    </label>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateVehicleCount('bike', form.bike_count - 1)}
+                        className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
+                        aria-label="Decrease bike count"
+                      >
+                        -
+                      </button>
+                      <input
+                        id="bike_count"
+                        name="bike_count"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={form.bike_count}
+                        onChange={(e) => updateVehicleCount('bike', Number(e.target.value))}
+                        className="premium-input number-spinner text-center"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateVehicleCount('bike', form.bike_count + 1)}
+                        className="h-10 w-10 rounded-xl border border-[#C6A75E]/35 bg-white text-lg text-[var(--text-dark)] transition hover:bg-[#f6f2e6]"
+                        aria-label="Increase bike count"
+                      >
+                        +
+                      </button>
+                    </div>
 
-                {form.bike_count > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {form.bike_numbers.map((value, index) => (
-                      <div key={`bike-${index}`} className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)]">{`Bike Number ${index + 1}`}</label>
-                        <input
-                          value={value}
-                          onChange={(e) => updateVehicleNumber('bike', index, e.target.value)}
-                          placeholder="TN10XY9876"
-                          className="premium-input"
-                        />
+                    {form.bike_count > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {form.bike_numbers.map((value, index) => (
+                          <div key={`bike-${index}`} className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)]">{`Bike Number ${index + 1}`}</label>
+                            <input
+                              value={value}
+                              onChange={(e) => updateVehicleNumber('bike', index, e.target.value)}
+                              placeholder="TN10XY9876"
+                              className="premium-input"
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <h3 className="font-semibold text-lg text-[#1F4F46]">Do you need accommodation (room)?</h3>
@@ -361,23 +446,26 @@ export default function GuestPage() {
                 onChange={handleChange}
                 inputMode="numeric"
                 maxLength={12}
-                className="premium-input"
+                className={`premium-input ${aadhaarError ? 'border-red-500 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' : ''}`}
               />
-              <select
-                name="room_type"
+              {aadhaarError && <p className="mt-1 text-sm text-red-600">{aadhaarError}</p>}
+              <LuxurySelect
                 value={form.room_type}
-                onChange={handleChange}
-                className="premium-input"
-              >
-                <option value="">Select Room Type</option>
-                <option value="Single Bed">Single Bed</option>
-                <option value="Double Bed">Double Bed</option>
-                <option value="Triple Bed">Triple Bed</option>
-              </select>
+                options={roomTypeOptions}
+                placeholder="Select Room Type"
+                onChange={(value: string) =>
+                  setForm((prev) => ({ ...prev, room_type: value }))
+                }
+              />
             </div>
           )}
 
-          <button className="gold-button w-full">Submit RSVP</button>
+          <button
+            className="gold-button w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={isSubmitDisabled}
+          >
+            Submit RSVP
+          </button>
         </form>
 
         {status && <p className="mt-4 text-center text-[var(--emerald)]">{status}</p>}

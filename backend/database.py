@@ -19,8 +19,6 @@ DB_CONNECT_DELAY = float(os.getenv("DB_CONNECT_DELAY", "1.0"))
 
 
 def _safe_database_target(url: str) -> str:
-    if url.startswith("sqlite"):
-        return url
     parsed = urlparse(url)
     host = parsed.hostname or "unknown-host"
     port = parsed.port or ""
@@ -32,21 +30,17 @@ engine_kwargs = {
     "echo": False,
     "pool_pre_ping": True,
     "pool_recycle": 300,
-}
-
-if database_url.startswith("sqlite"):
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    engine_kwargs["pool_use_lifo"] = True
-    engine_kwargs["connect_args"] = {
+    "pool_use_lifo": True,
+    "connect_args": {
         "keepalives": 1,
         "keepalives_idle": 30,
         "keepalives_interval": 10,
         "keepalives_count": 5,
         "connect_timeout": DB_CONNECT_TIMEOUT,
-    }
-    engine_kwargs["pool_size"] = DB_POOL_SIZE
-    engine_kwargs["max_overflow"] = DB_MAX_OVERFLOW
+    },
+    "pool_size": DB_POOL_SIZE,
+    "max_overflow": DB_MAX_OVERFLOW,
+}
 
 logger.info("Database target: %s", _safe_database_target(database_url))
 engine = create_engine(database_url, **engine_kwargs)
@@ -71,48 +65,27 @@ def _safe_table_name(table_name: str) -> str:
 
 def _table_exists(connection, table_name: str) -> bool:
     table_name = _safe_table_name(table_name)
-    dialect = connection.engine.dialect.name
-
-    if dialect == "postgresql":
-        exists = connection.execute(
-            text("SELECT to_regclass(:table_name) IS NOT NULL"),
-            {"table_name": table_name},
-        ).scalar()
-        return bool(exists)
-
-    if dialect == "sqlite":
-        exists = connection.execute(
-            text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
-            {"table_name": table_name},
-        ).scalar()
-        return exists is not None
-
-    return False
+    exists = connection.execute(
+        text("SELECT to_regclass(:table_name) IS NOT NULL"),
+        {"table_name": table_name},
+    ).scalar()
+    return bool(exists)
 
 
 def _get_columns(connection, table_name: str) -> set[str]:
     table_name = _safe_table_name(table_name)
-    dialect = connection.engine.dialect.name
-
-    if dialect == "postgresql":
-        rows = connection.execute(
-            text(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = current_schema()
-                  AND table_name = :table_name
-                """
-            ),
-            {"table_name": table_name},
-        ).fetchall()
-        return {row[0] for row in rows}
-
-    if dialect == "sqlite":
-        rows = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-        return {row[1] for row in rows}
-
-    return set()
+    rows = connection.execute(
+        text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = :table_name
+            """
+        ),
+        {"table_name": table_name},
+    ).fetchall()
+    return {row[0] for row in rows}
 
 def wait_for_db(retries: int | None = None, delay: float | None = None):
     """Block until the database is ready or raise after retries."""
@@ -237,110 +210,55 @@ def ensure_runtime_schema():
                 )
 
             if not _table_exists(connection, "vehicle_details"):
-                if connection.engine.dialect.name == "postgresql":
-                    connection.execute(
-                        text(
-                            """
-                            CREATE TABLE IF NOT EXISTS vehicle_details (
-                                id SERIAL PRIMARY KEY,
-                                guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
-                                vehicle_type VARCHAR NOT NULL,
-                                vehicle_number VARCHAR NOT NULL
-                            )
-                            """
+                connection.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS vehicle_details (
+                            id SERIAL PRIMARY KEY,
+                            guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+                            vehicle_type VARCHAR NOT NULL,
+                            vehicle_number VARCHAR NOT NULL
                         )
+                        """
                     )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_vehicle_details_guest_id ON vehicle_details (guest_id)"
-                        )
+                )
+                connection.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_vehicle_details_guest_id ON vehicle_details (guest_id)"
                     )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_vehicle_details_vehicle_type ON vehicle_details (vehicle_type)"
-                        )
+                )
+                connection.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_vehicle_details_vehicle_type ON vehicle_details (vehicle_type)"
                     )
+                )
 
             if not _table_exists(connection, "room_allocations"):
-                if connection.engine.dialect.name == "postgresql":
-                    connection.execute(
-                        text(
-                            """
-                            CREATE TABLE IF NOT EXISTS room_allocations (
-                                id SERIAL PRIMARY KEY,
-                                guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
-                                event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-                                hotel_name VARCHAR NOT NULL,
-                                room_number VARCHAR NOT NULL,
-                                location TEXT,
-                                allocated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
-                                CONSTRAINT uq_room_allocations_guest_id UNIQUE (guest_id)
-                            )
-                            """
+                connection.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS room_allocations (
+                            id SERIAL PRIMARY KEY,
+                            guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+                            event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                            hotel_name VARCHAR NOT NULL,
+                            room_number VARCHAR NOT NULL,
+                            location TEXT,
+                            allocated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                            CONSTRAINT uq_room_allocations_guest_id UNIQUE (guest_id)
                         )
+                        """
                     )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
-                        )
+                )
+                connection.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
                     )
-                elif connection.engine.dialect.name == "sqlite":
-                    connection.execute(
-                        text(
-                            """
-                            CREATE TABLE IF NOT EXISTS room_allocations (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                guest_id INTEGER NOT NULL,
-                                event_id INTEGER NOT NULL,
-                                hotel_name TEXT NOT NULL,
-                                room_number TEXT NOT NULL,
-                                location TEXT,
-                                allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                UNIQUE(guest_id),
-                                FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE CASCADE,
-                                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
-                            )
-                            """
-                        )
-                    )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_room_allocations_event_id ON room_allocations (event_id)"
-                        )
-                    )
+                )
             else:
-                if connection.engine.dialect.name == "postgresql":
-                    existing_columns = _get_columns(connection, "room_allocations")
-                    if "location" not in existing_columns:
-                        connection.execute(text("ALTER TABLE room_allocations ADD COLUMN location TEXT"))
-                elif connection.engine.dialect.name == "sqlite":
-                    existing_columns = _get_columns(connection, "room_allocations")
-                    if "location" not in existing_columns:
-                        connection.execute(text("ALTER TABLE room_allocations ADD COLUMN location TEXT"))
-                elif connection.engine.dialect.name == "sqlite":
-                    connection.execute(
-                        text(
-                            """
-                            CREATE TABLE IF NOT EXISTS vehicle_details (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                guest_id INTEGER NOT NULL,
-                                vehicle_type TEXT NOT NULL,
-                                vehicle_number TEXT NOT NULL,
-                                FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE CASCADE
-                            )
-                            """
-                        )
-                    )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_vehicle_details_guest_id ON vehicle_details (guest_id)"
-                        )
-                    )
-                    connection.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_vehicle_details_vehicle_type ON vehicle_details (vehicle_type)"
-                        )
-                    )
+                existing_columns = _get_columns(connection, "room_allocations")
+                if "location" not in existing_columns:
+                    connection.execute(text("ALTER TABLE room_allocations ADD COLUMN location TEXT"))
 
             if _table_exists(connection, "sos"):
                 existing_sos_columns = _get_columns(connection, "sos")

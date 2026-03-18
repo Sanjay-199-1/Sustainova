@@ -737,7 +737,8 @@ def organizer_sos(
             "guest_phone": guest.phone,
             "event_name": event_row.event_name,
             "reason": sos.reason,
-            "triggered_at": sos.triggered_at
+            "triggered_at": sos.triggered_at,
+            "created_at": sos.triggered_at
         }
         for sos, guest, event_row in alerts
     ]

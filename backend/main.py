@@ -1,8 +1,11 @@
 from fastapi import FastAPI
-from database import engine, Base, wait_for_db, ensure_runtime_schema
+from database import engine, Base, ensure_runtime_schema
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+
+# Ensure models are registered before create_all
+from models import *
 
 # ✅ include events
 from routes import auth, events, guests, entrance, sos, dashboard, reminders, checkin, ml, announcements, rooms
@@ -12,7 +15,7 @@ app = FastAPI(title="Sustainova Backend")
 
 @app.on_event("startup")
 def on_startup():
-    wait_for_db()
+    print("ACTUAL DATABASE:", os.getenv("DATABASE_URL"))
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema()
 

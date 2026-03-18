@@ -11,10 +11,10 @@ services:
       - 1.1.1.1
       - 8.8.8.8
     environment:
-      REDIS_HOST: sustainova-redis
+      REDIS_HOST: redis
       REDIS_PORT: "6379"
     depends_on:
-      - sustainova-redis
+      - redis
 
   sustainova-frontend:
     build: ./frontend
@@ -25,7 +25,5 @@ services:
     depends_on:
       - sustainova-backend
 
-  sustainova-redis:
+  redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"

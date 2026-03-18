@@ -113,6 +113,7 @@ interface SosAlert {
   event_name: string;
   reason: string;
   triggered_at: string;
+  created_at?: string;
   resolved: boolean;
 }
 
@@ -155,6 +156,9 @@ export default function OrganizerDashboard() {
     const res = await api.get(`/sos/event/${eventId}`);
     const alerts: SosAlert[] = res.data || [];
     const activeAlerts = alerts.filter((alert) => !alert.resolved);
+    alerts.forEach((alert) => {
+      console.log('SOS Time:', alert.triggered_at);
+    });
 
     if (previousSosCount.current === 0 && activeAlerts.length > 0) {
       try {
@@ -297,12 +301,15 @@ export default function OrganizerDashboard() {
     });
   };
 
-  const formatTime = (value: string) =>
-    new Date(value + 'Z').toLocaleString('en-IN', {
-      timeZone: 'Asia/Kolkata',
+  const formatSosTime = (time: string | null | undefined) => {
+    if (!time) return '—';
+    const date = new Date(time);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('en-IN', {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
+  };
 
   const exportGuestList = async () => {
     if (!dashboard) return;
@@ -566,7 +573,9 @@ export default function OrganizerDashboard() {
                     <td className="px-4 py-3 text-[var(--text-dark)]">{alert.guest_phone}</td>
                     <td className="px-4 py-3 text-[var(--text-dark)]">{alert.event_name || eventMeta?.event_name || '-'}</td>
                     <td className="px-4 py-3 text-[var(--text-dark)] whitespace-pre-wrap">{alert.reason || '-'}</td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">{formatTime(alert.triggered_at)}</td>
+                    <td className="px-4 py-3 text-[var(--text-soft)]">
+                      {formatSosTime((alert as any).created_at || alert.triggered_at)}
+                    </td>
                     <td className="px-4 py-3">
                       {alert.resolved ? (
                         <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">

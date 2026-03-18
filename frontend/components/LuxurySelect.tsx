@@ -2,9 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type LuxurySelectOption = {
+  label: string;
+  value: string;
+};
+
 type LuxurySelectProps = {
   value: string;
-  options: string[];
+  options: LuxurySelectOption[];
   onChange: (value: string) => void;
   placeholder: string;
 };
@@ -17,6 +22,7 @@ export default function LuxurySelect({
 }: LuxurySelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const selectedOption = options.find((option) => option.value === value);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -36,7 +42,9 @@ export default function LuxurySelect({
         onClick={() => setOpen((prev) => !prev)}
         className="premium-select flex w-full items-center justify-between text-left shadow-sm transition-all duration-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[#C6A75E]/40"
       >
-        <span className="text-[#2C2C2C]">{value || placeholder}</span>
+        <span className={selectedOption ? "text-[#2C2C2C]" : "text-[var(--text-soft)]"}>
+          {selectedOption?.label || placeholder}
+        </span>
         <svg
           className={`h-5 w-5 text-[#A88B4C] transition-transform duration-300 ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20"
@@ -58,19 +66,19 @@ export default function LuxurySelect({
         <div className="animate-fadeIn absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-[#C6A75E]/30 bg-white shadow-xl">
           {options.map((option) => (
             <button
-              key={option}
+              key={option.value}
               type="button"
               onClick={() => {
-                onChange(option);
+                onChange(option.value);
                 setOpen(false);
               }}
               className={`w-full cursor-pointer px-4 py-2.5 text-left transition-all duration-200 hover:bg-[#F8F5F0] ${
-                value === option
+                value === option.value
                   ? "bg-[#C6A75E]/10 font-medium text-[#C6A75E]"
                   : ""
               }`}
             >
-              {option}
+              {option.label}
             </button>
           ))}
         </div>

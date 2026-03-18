@@ -74,6 +74,7 @@ def active_sos(
             "event_name": event_row.event_name,
             "reason": sos.reason,
             "triggered_at": sos.triggered_at,
+            "created_at": sos.triggered_at,
             "resolved": sos.resolved,
         }
         for sos, guest, event_row in alerts
@@ -112,6 +113,7 @@ def event_sos_alerts(
             "event_name": event_row.event_name,
             "reason": sos.reason,
             "triggered_at": sos.triggered_at,
+            "created_at": sos.triggered_at,
             "resolved": sos.resolved,
         }
         for sos, guest, event_row in alerts

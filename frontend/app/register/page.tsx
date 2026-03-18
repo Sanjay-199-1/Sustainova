@@ -8,6 +8,9 @@ import { useToast } from '../../components/ToastContext';
 import { formatPhoneForInput, normalizePhone } from '../../services/phone';
 import LeafletLocationMap from '../../components/LeafletLocationMap';
 
+const phoneRegex = /^[6-9]\d{9}$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type RegisterForm = {
   name: string;
   email: string;
@@ -48,6 +51,12 @@ export default function RegisterPage() {
   const [qr, setQr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const phoneValid = phoneRegex.test(normalizePhone(form.phone));
+  const emailValid = emailRegex.test(form.email);
+  const phoneError = form.phone && !phoneValid ? 'Enter a valid 10-digit phone number' : '';
+  const emailError = form.email && !emailValid ? 'Enter a valid email address' : '';
+  const isSubmitDisabled = loading || !phoneValid || !emailValid;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -154,11 +163,30 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="form-label">Email</label>
-              <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} required className="premium-input" />
+              <input
+                name="email"
+                type="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={handleChange}
+                required
+                className={`premium-input ${emailError ? 'border-red-500 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' : ''}`}
+              />
+              {emailError && <p className="mt-1 text-sm text-red-600">{emailError}</p>}
             </div>
             <div>
               <label className="form-label">Phone</label>
-              <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} required inputMode="numeric" maxLength={11} className="premium-input" />
+              <input
+                name="phone"
+                placeholder="Phone"
+                value={form.phone}
+                onChange={handleChange}
+                required
+                inputMode="numeric"
+                maxLength={11}
+                className={`premium-input ${phoneError ? 'border-red-500 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' : ''}`}
+              />
+              {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
             </div>
             <div>
               <label className="form-label">Event Name</label>
@@ -275,7 +303,11 @@ export default function RegisterPage() {
 
           {error && <p className="text-red-600 text-sm">{error}</p>}
 
-          <button type="submit" disabled={loading} className="gold-button w-full disabled:opacity-60">
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="gold-button w-full disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             {loading ? 'Creating...' : 'Register'}
           </button>
         </form>

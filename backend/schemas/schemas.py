@@ -1,6 +1,37 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+import re
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+PHONE_REGEX = re.compile(r'^[6-9]\d{9}$')
+EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+AADHAAR_REGEX = re.compile(r'^\d{12}$')
+
+
+def _normalize_phone(value: str) -> str:
+    return value.strip().replace("+91", "").replace(" ", "").replace("-", "")
+
+
+def _validate_phone(value: str) -> str:
+    cleaned = _normalize_phone(value)
+    if not PHONE_REGEX.match(cleaned):
+        raise ValueError("Enter a valid 10-digit phone number")
+    return cleaned
+
+
+def _validate_email(value: str) -> str:
+    if not EMAIL_REGEX.match(value):
+        raise ValueError("Enter a valid email address")
+    return value
+
+
+def _validate_aadhaar(value: str | None) -> str | None:
+    if value is None or value == "":
+        return None
+    cleaned = re.sub(r"\D", "", value)
+    if not AADHAAR_REGEX.match(cleaned):
+        raise ValueError("Enter a valid 12-digit Aadhaar number")
+    return cleaned
 
 
 # ---------------- USER ----------------
@@ -9,6 +40,16 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return _validate_email(value)
 
 
 class OrganizerRegister(BaseModel):
@@ -26,14 +67,34 @@ class OrganizerRegister(BaseModel):
     longitude: Optional[float] = None
     invitation_image_url: Optional[str] = None
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return _validate_email(value)
+
 
 class OTPRequest(BaseModel):
     phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
 
 
 class OTPVerify(BaseModel):
     phone: str
     otp: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
 
 
 class UserOut(BaseModel):
@@ -101,6 +162,16 @@ class GuestCreate(BaseModel):
     room_type: Optional[str] = None
     event_id: int
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
+
+    @field_validator("aadhar_number")
+    @classmethod
+    def validate_aadhaar(cls, value: str | None) -> str | None:
+        return _validate_aadhaar(value)
+
 
 class GuestRSVPCreate(BaseModel):
     name: str
@@ -118,6 +189,16 @@ class GuestRSVPCreate(BaseModel):
     aadhar_number: Optional[str] = None
     room_type: Optional[str] = None
     event_token: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return _validate_phone(value)
+
+    @field_validator("aadhar_number")
+    @classmethod
+    def validate_aadhaar(cls, value: str | None) -> str | None:
+        return _validate_aadhaar(value)
 
 
 class GuestOut(BaseModel):
